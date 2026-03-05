@@ -292,6 +292,24 @@ with st.sidebar:
     <div style="color:#475569;font-size:0.78rem;line-height:1.5;">{cfg.description}</div>
     """, unsafe_allow_html=True)
 
+    # ── Model status badge ────────────────────────────────────────────────────
+    import os as _os
+    _weights_ok = bool(cfg.weights_path) and _os.path.isfile(cfg.weights_path)
+    if _weights_ok:
+        st.markdown("""
+        <div style="margin-top:0.7rem;padding:6px 10px;border-radius:6px;
+                    background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.3);
+                    color:#4ade80;font-size:0.75rem;font-family:'Space Mono',monospace;">
+          ✔ Fine-tuned medical weights loaded
+        </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="margin-top:0.7rem;padding:6px 10px;border-radius:6px;
+                    background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.25);
+                    color:#fbbf24;font-size:0.75rem;font-family:'Space Mono',monospace;">
+          ⚠ ImageNet pretrained — not medically validated
+        </div>""", unsafe_allow_html=True)
+
     st.markdown("---")
     st.markdown(f"""
     <div class="card-label">Detectable Conditions</div>
@@ -478,6 +496,24 @@ with col_result:
 
         st.markdown("</div>", unsafe_allow_html=True)
 
+        # ── AI Attention Heatmap (GradCAM) ────────────────────────────────────
+        if result.heatmap is not None:
+            st.markdown("""
+            <div style="margin-top:1.2rem;font-family:'Space Mono',monospace;
+                        font-size:0.6rem;color:#475569;letter-spacing:0.1em;
+                        text-transform:uppercase;margin-bottom:0.6rem;">
+              AI Attention Heatmap
+            </div>""", unsafe_allow_html=True)
+            col_orig2, col_heat = st.columns(2)
+            with col_orig2:
+                st.markdown("<div style='font-size:0.72rem;color:#475569;margin-bottom:4px;'>Original</div>",
+                            unsafe_allow_html=True)
+                st.image(image.resize((224, 224)), use_container_width=True)
+            with col_heat:
+                st.markdown("<div style='font-size:0.72rem;color:#475569;margin-bottom:4px;'>Grad-CAM</div>",
+                            unsafe_allow_html=True)
+                st.image(result.heatmap, use_container_width=True)
+
         # ── Technical details ─────────────────────────────────────────────────
         with st.expander("Technical Details", expanded=False):
             st.markdown(f"""
@@ -488,6 +524,7 @@ with col_result:
             | Inference device | `{result.device_used}` |
             | Input resolution | `224 × 224` |
             | Classes | `{len(result.all_classes)}` |
+            | GradCAM | `{"Available" if result.heatmap is not None else "Unavailable"}` |
             """)
 
 

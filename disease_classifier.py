@@ -13,7 +13,8 @@ Usage example:
     print(result)
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 import torch
 import torch.nn.functional as F
 from PIL import Image
@@ -35,6 +36,7 @@ class PredictionResult:
     model_backbone: str
     using_finetuned_weights: bool
     device_used: str
+    heatmap: Optional[Image.Image] = None   # GradCAM overlay (None if unavailable)
 
     def top_n(self, n: int = 3) -> list[tuple[str, float]]:
         """Return the top-n (class, probability) pairs."""
@@ -82,16 +84,18 @@ class DiagnosticEngine:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def predict(self, image: Image.Image, scan_type: str) -> PredictionResult:
+    def predict(self, image: Image.Image, scan_type: str,
+                generate_heatmap: bool = True) -> PredictionResult:
         """
         Run inference on a PIL Image for the specified scan type.
 
         Args:
-            image:     PIL Image (any size / mode)
-            scan_type: One of the registered scan types
+            image:            PIL Image (any size / mode)
+            scan_type:        One of the registered scan types
+            generate_heatmap: If True, attempt GradCAM (silently skipped on error)
 
         Returns:
-            PredictionResult with ranked classes and probabilities
+            PredictionResult with ranked classes, probabilities, and optional heatmap
         """
         if scan_type not in get_registered_scan_types():
             raise ValueError(
@@ -114,6 +118,21 @@ class DiagnosticEngine:
         sorted_classes = [cfg.class_names[i] for i in sorted_indices]
         sorted_probs   = [probs[i].item()    for i in sorted_indices]
 
+        # ── Optional GradCAM (separate forward pass, never crashes) ───────────
+        heatmap = None
+        if generate_heatmap:
+            try:
+                from gradcam import generate_gradcam
+                _, heatmap = generate_gradcam(
+                    model=model,
+                    image_tensor=tensor,
+                    target_class=sorted_indices[0],
+                    backbone=cfg.backbone,
+                    original_image=image,
+                )
+            except Exception:
+                heatmap = None
+
         return PredictionResult(
             scan_type              = scan_type,
             top_class              = sorted_classes[0],
@@ -123,6 +142,7 @@ class DiagnosticEngine:
             model_backbone         = cfg.backbone,
             using_finetuned_weights= bool(cfg.weights_path),
             device_used            = str(self.device),
+            heatmap                = heatmap,
         )
 
     def supported_scan_types(self) -> list[str]:

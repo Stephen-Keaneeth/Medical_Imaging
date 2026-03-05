@@ -46,18 +46,14 @@ class ModelConfig:
 MODEL_REGISTRY: dict[str, ModelConfig] = {
 
     "X-Ray (Chest)": ModelConfig(
-        backbone     = "resnet50",
-        num_classes  = 6,
+        backbone     = "resnet18",          # resnet18 for fast CPU training
+        num_classes  = 2,                   # NORMAL / PNEUMONIA (Kaggle dataset)
         class_names  = [
             "Normal",
             "Pneumonia",
-            "COVID-19",
-            "Tuberculosis",
-            "Cardiomegaly",
-            "Pleural Effusion",
         ],
-        weights_path = None,   # Replace with "models/cxr_resnet50.pth" after training
-        description  = "ResNet-50 trained on CheXpert / NIH Chest X-ray datasets",
+        weights_path = "models/cxr_resnet50.pth",  # auto-loaded once train.py finishes
+        description  = "ResNet-18 trained on Chest X-Ray dataset (NORMAL / PNEUMONIA)",
     ),
 
     "MRI (Brain)": ModelConfig(
@@ -194,7 +190,7 @@ def load_model(scan_type: str, device: torch.device) -> tuple[nn.Module, ModelCo
     if cfg.weights_path:
         import os
         if os.path.isfile(cfg.weights_path):
-            state = torch.load(cfg.weights_path, map_location=device)
+            state = torch.load(cfg.weights_path, map_location=device, weights_only=True)
             model.load_state_dict(state)
             print(f"[model_loader] Loaded fine-tuned weights: {cfg.weights_path}")
         else:
